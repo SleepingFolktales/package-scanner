@@ -261,19 +261,6 @@ package-scanner/
 └── README.md                # This file
 ```
 
-## 🛡️ Real-World Attack Coverage
-
-This tool is designed to detect patterns from actual supply chain attacks:
-
-| Attack | Year | What Happened | Detection Coverage |
-|--------|------|---------------|-------------------|
-| **litellm** | 2024 | .pth file executed encoded payload on startup | ✅ .pth analysis, base64 decode chains |
-| **event-stream** | 2018 | Hidden backdoor in transitive dependency | ✅ Obfuscation, credential harvesting |
-| **ua-parser-js** | 2021 | Crypto miner + credential stealer in postinstall | ✅ postinstall hooks, subprocess execution |
-| **node-ipc** | 2022 | Protestware wiping files based on geolocation | ✅ fs operations, destructive patterns |
-| **colors/faker** | 2022 | Infinite loop protestware | ✅ Lifecycle hooks |
-| **ESLint scope** | 2018 | npm token theft via postinstall | ✅ .npmrc access, credential patterns |
-
 ## 🔧 Troubleshooting
 
 ### "bash not found" on Windows
