@@ -2,28 +2,65 @@
 
 Supply chain attack detection tool for Python (PyPI) and npm packages. Inspired by real-world incidents including the litellm 1.82.8 attack (CVE 2026-03-24), event-stream, ua-parser-js, and node-ipc compromises.
 
-## 🎯 What It Detects
+## 🎯 Scanner Overview & Detection Capabilities
 
 ### Python Package Scanner (`pkg_scan.sh`)
-- **.pth backdoor files** — Auto-execute code on Python startup
-- **Base64 encoded payloads** — `exec(base64.b64decode(...))`
-- **Obfuscation chains** — `compile()`, `marshal`, `pickle`, `zlib` → `exec()`
-- **Subprocess execution** — Shell commands, system calls
-- **Network exfiltration** — HTTP POST to hardcoded IPs, suspicious domains
-- **Credential harvesting** — SSH keys, AWS/GCP/Azure credentials, crypto wallets
-- **Encryption staging** — RSA/AES encryption before exfiltration
-- **Setup.py hook abuse** — Install-time execution
-- **RECORD file tampering** — Hidden .pth registration
+
+**Purpose**: Scans Python packages from PyPI for malicious code patterns without installation. Downloads the package tarball, extracts it, and performs 12-step static analysis to detect supply chain attacks.
+
+**How it works**:
+1. Downloads package via `pip download` (no installation)
+2. Extracts wheel (.whl) or tarball (.tar.gz)
+3. Scans all Python files for 50+ malicious patterns
+4. Generates severity-scored report (CRITICAL/HIGH/MEDIUM/LOW)
+
+**12-Step Detection Coverage**:
+
+| Step | Category | What It Checks |
+|------|----------|---|
+| **1** | Download | Fetches package from PyPI registry safely |
+| **2** | Extraction | Unpacks wheel or tarball for analysis |
+| **3** | .pth Backdoors | Detects auto-executing .pth files (litellm attack vector) |
+| **4** | Obfuscation | Base64 decode chains, `exec()`, `compile()`, `marshal`, `pickle`, `zlib` compression |
+| **5** | Subprocess & Network | `subprocess.Popen`, `os.system`, `curl` POST, HTTP exfiltration |
+| **6** | Credential Harvesting | SSH keys, AWS/GCP/Azure/Docker credentials, crypto wallets, browser auth tokens |
+| **7** | Encryption & Staging | RSA/AES encryption, tar archive creation (pre-exfil staging) |
+| **8** | Install Hooks | `setup.py` abuse, `pyproject.toml` hooks, RECORD file tampering |
+| **9** | Reverse Shell & Persistence | Socket+subprocess combos, PTY allocation, cron jobs, systemd services, Windows registry Run keys |
+| **10** | Import Hook Abuse | `sys.meta_path` hijacking, `__builtins__` tampering, `ctypes` native code execution, `sys.settrace` spying |
+| **11** | Surveillance | Keyloggers (pynput), screen/webcam capture, microphone recording, browser profile theft, clipboard access, Discord/Telegram exfil |
+| **12** | Anti-Analysis & Evasion | Debugger detection, VM/sandbox detection, time-bombs, geofencing, probabilistic execution, ROT13 obfuscation |
+
+---
 
 ### npm Package Scanner (`npm_scan.sh`)
-- **Lifecycle hook abuse** — postinstall/preinstall/prepare scripts
-- **eval() chains** — `eval()`, `Function()`, charcode obfuscation
-- **Buffer decode execution** — `eval(Buffer.from(...,'base64'))`
-- **child_process usage** — `exec()`, `spawn()`, shell execution
-- **Network exfiltration** — HTTP POST, WebSocket, DNS tunneling
-- **Credential harvesting** — SSH keys, cloud credentials, GitHub tokens
-- **Native addons** — Compiled .node binaries (opaque to analysis)
-- **Dependency confusion** — Typosquatting, missing repository links
+
+**Purpose**: Scans npm packages from the registry for malicious code patterns without installation. Downloads the tarball, extracts it, and performs 13-step static analysis to detect supply chain attacks in Node.js/JavaScript packages.
+
+**How it works**:
+1. Downloads package via `npm pack` (no installation, ignores scripts)
+2. Extracts tarball contents
+3. Analyzes `package.json` lifecycle hooks
+4. Scans all JS/TS source files for 60+ malicious patterns
+5. Generates severity-scored report (CRITICAL/HIGH/MEDIUM/LOW)
+
+**13-Step Detection Coverage**:
+
+| Step | Category | What It Checks |
+|------|----------|---|
+| **1** | Download | Fetches package from npm registry safely via `npm pack` |
+| **2** | Extraction | Unpacks tarball for analysis |
+| **3** | Lifecycle Hooks | `preinstall`, `install`, `postinstall`, `prepare`, `prepublish` scripts (primary npm attack vector) |
+| **4** | Obfuscation | `eval()`, `Function()` constructor, `Buffer.from(...,'base64')`, JSFuck patterns, charcode obfuscation |
+| **5** | child_process & Shell | `child_process.exec/spawn`, `os.system`, `shelljs`, `execa` (shell execution) |
+| **6** | Network Exfiltration | HTTP clients (axios, got, node-fetch), POST requests, hardcoded IPs, WebSocket, DNS tunneling |
+| **7** | Credential Harvesting | SSH keys, AWS/GCP/Azure/Docker credentials, `.npmrc` tokens, GitHub tokens, crypto wallets |
+| **8** | Native Addons | Compiled `.node` binaries (opaque to source analysis) in unconventional paths |
+| **9** | Metadata Red Flags | Missing repository links, typosquatting detection, fresh versions with no history |
+| **10** | Prototype Pollution & Injection | `__proto__` mutation, `constructor.prototype` abuse, dynamic `require()` with user input, XSS sinks, path traversal, unsafe YAML/serialization |
+| **11** | Reverse Shell & Persistence | `net.Socket` creation, socket-to-spawn piping, interactive shell strings, cron/scheduler libraries, Windows registry, `pm2 startup` |
+| **12** | Electron/Browser Exploitation | Dangerous Electron configs (`nodeIntegration:true`, `contextIsolation:false`), `electron.remote.require()`, browser profile theft, clipboard access |
+| **13** | Cryptomining, Bots & Anti-Analysis | Mining pools (xmrig, coinhive), Discord/Telegram/Slack bot exfil, Ethereum wallets, debugger detection, VM detection, CI environment evasion, time-bombs, probabilistic execution |
 
 ## 📦 Prerequisites
 

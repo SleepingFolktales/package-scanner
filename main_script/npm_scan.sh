@@ -109,7 +109,7 @@ echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━�
 # ─────────────────────────────────────────────────────────────────────────────
 #  STEP 1 — DOWNLOAD (npm pack — no install, just tarball)
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "${BOLD}[1/9] Downloading package from npm registry (no install)...${RESET}"
+echo -e "${BOLD}[1/13] Downloading package from npm registry (no install)...${RESET}"
 
 if ! check_tool npm; then
     echo -e "${RED}[ERROR]${RESET} 'npm' not found. Please install Node.js first."
@@ -135,7 +135,7 @@ echo -e "  ${GREEN}✓${RESET} Downloaded: $(basename "$TARBALL") ($TARBALL_SIZE
 # ─────────────────────────────────────────────────────────────────────────────
 #  STEP 2 — EXTRACT
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "\n${BOLD}[2/9] Extracting package contents...${RESET}"
+echo -e "\n${BOLD}[2/13] Extracting package contents...${RESET}"
 tar -xzf "$TARBALL" -C "$EXTRACT_DIR" 2>/dev/null
 # npm pack always puts contents in a 'package/' subdirectory
 PKG_DIR="$EXTRACT_DIR/package"
@@ -149,7 +149,7 @@ echo -e "  ${GREEN}✓${RESET} Extracted $FILE_COUNT files ($JS_COUNT JS/TS sour
 #  STEP 3 — package.json LIFECYCLE SCRIPT ANALYSIS
 #  The npm equivalent of the Python .pth attack vector.
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "\n${BOLD}[3/9] Analysing package.json lifecycle scripts (primary attack vector)...${RESET}"
+echo -e "\n${BOLD}[3/13] Analysing package.json lifecycle scripts (primary attack vector)...${RESET}"
 
 PKG_JSON="$PKG_DIR/package.json"
 if [[ ! -f "$PKG_JSON" ]]; then
@@ -211,7 +211,7 @@ fi
 #  STEP 4 — OBFUSCATION & EVAL CHAINS
 #  JS equivalents of exec(base64.b64decode(...))
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "\n${BOLD}[4/9] Scanning for obfuscation and encoded payload execution...${RESET}"
+echo -e "\n${BOLD}[4/13] Scanning for obfuscation and encoded payload execution...${RESET}"
 
 grep_files "eval\s*\(" \
     "eval() usage detected" "HIGH"
@@ -243,7 +243,7 @@ grep_files "require\s*\(\s*['\"]_[a-z0-9]{1,4}['\"]|require\s*\(\s*['\"]\.[a-z]{
 # ─────────────────────────────────────────────────────────────────────────────
 #  STEP 5 — child_process & SHELL EXECUTION
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "\n${BOLD}[5/9] Checking for child_process and shell execution...${RESET}"
+echo -e "\n${BOLD}[5/13] Checking for child_process and shell execution...${RESET}"
 
 grep_files "require\s*\(\s*['\"]child_process['\"]|from\s+['\"]child_process['\"]" \
     "child_process module imported" "HIGH"
@@ -260,7 +260,7 @@ grep_files "process\.binding\s*\(" \
 # ─────────────────────────────────────────────────────────────────────────────
 #  STEP 6 — NETWORK EXFILTRATION
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "\n${BOLD}[6/9] Scanning for network exfiltration patterns...${RESET}"
+echo -e "\n${BOLD}[6/13] Scanning for network exfiltration patterns...${RESET}"
 
 grep_files "require\s*\(\s*['\"]https?['\"]|require\s*\(\s*['\"]node-fetch['\"]|require\s*\(\s*['\"]axios['\"]|require\s*\(\s*['\"]got['\"]" \
     "HTTP client module imported (http/https/axios/got/node-fetch)" "MEDIUM"
@@ -286,7 +286,7 @@ grep_files "WebSocket\s*\(|ws\s*=\s*new|require\s*\(\s*['\"]ws['\"]" \
 # ─────────────────────────────────────────────────────────────────────────────
 #  STEP 7 — CREDENTIAL HARVESTING
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "\n${BOLD}[7/9] Scanning for credential harvesting patterns...${RESET}"
+echo -e "\n${BOLD}[7/13] Scanning for credential harvesting patterns...${RESET}"
 
 grep_files "process\.env\b" \
     "process.env access — environment variable enumeration (API keys, tokens)" "MEDIUM"
@@ -332,7 +332,7 @@ grep_files "github_token|GITHUB_TOKEN|GH_TOKEN|ghp_[A-Za-z0-9]" \
 #  .node files are compiled native extensions — completely opaque to source
 #  analysis and can do anything at the OS level.
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "\n${BOLD}[8/9] Checking for native addon binaries (.node files)...${RESET}"
+echo -e "\n${BOLD}[8/13] Checking for native addon binaries (.node files)...${RESET}"
 
 NODE_BINARIES=$(find "$PKG_DIR" -name "*.node" 2>/dev/null)
 if [[ -z "$NODE_BINARIES" ]]; then
@@ -364,7 +364,7 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 #  STEP 9 — DEPENDENCY CONFUSION & METADATA CHECKS
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "\n${BOLD}[9/9] Checking package metadata for red flags...${RESET}"
+echo -e "\n${BOLD}[9/13] Checking package metadata for red flags...${RESET}"
 
 if [[ -f "$PKG_JSON" ]] && check_tool python3; then
     python3 -c "
@@ -422,6 +422,135 @@ for p in popular:
         esac
     done
 fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  STEP 10 — PROTOTYPE POLLUTION & CODE INJECTION
+# ─────────────────────────────────────────────────────────────────────────────
+echo -e "\n${BOLD}[10/13] Scanning for prototype pollution and injection patterns...${RESET}"
+
+grep_files "__proto__\s*[=\[]|constructor\.prototype\s*\.|Object\.prototype\." \
+    "Prototype pollution pattern (__proto__ / constructor.prototype modification)" "HIGH"
+
+grep_files "merge\s*\(.*__proto__\|extend\s*\(.*constructor\|assign\s*\(.*__proto__" \
+    "Prototype pollution via merge/extend/assign (corrupts all objects globally)" "CRITICAL"
+
+grep_files "require\s*\(\s*req\.\|require\s*\(\s*body\.\|require\s*\(\s*params\.\|require\s*\(\s*query\." \
+    "Dynamic require() with user-controlled input (Remote Code Execution vector)" "CRITICAL"
+
+grep_files "innerHTML\s*=\|document\.write\s*\(\|dangerouslySetInnerHTML\s*=" \
+    "XSS sink — innerHTML/document.write/dangerouslySetInnerHTML" "HIGH"
+
+grep_files "path\.join\s*\(.*req\.\|path\.resolve\s*\(.*req\.\|readFile.*req\.\|createReadStream.*req\." \
+    "Path traversal via unsanitized request parameter (directory escape)" "HIGH"
+
+grep_files "vm\.runInNewContext\s*\(|vm\.runInThisContext\s*\(|vm\.runInContext\s*\(" \
+    "Node.js vm module execution (sandbox escape vector)" "HIGH"
+
+grep_files "yaml\.load\s*\([^{]|js-yaml.*\bload\b[^S]" \
+    "Unsafe YAML.load() — use safeLoad/load with schema instead" "HIGH"
+
+grep_files "serialize-javascript\b|node-serialize\b|serialize\s*\(.*function" \
+    "Unsafe object serialization library (can deserialize executable functions)" "HIGH"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  STEP 11 — REVERSE SHELL & PERSISTENCE MECHANISMS
+# ─────────────────────────────────────────────────────────────────────────────
+echo -e "\n${BOLD}[11/13] Checking for reverse shell and persistence patterns...${RESET}"
+
+grep_files "net\.Socket\s*\(\)\|new\s+net\.Socket\b" \
+    "Raw TCP net.Socket creation (reverse shell precursor)" "HIGH"
+
+grep_files "socket\.pipe\s*\(\s*spawn\|spawn.*stdio.*socket\|net\.createConnection.*shell" \
+    "Socket piped to process spawn (reverse shell pattern)" "CRITICAL"
+
+grep_files "/bin/sh.*-i\|/bin/bash.*-i\|cmd\.exe.*/c\|powershell.*-[Ee]nc\|powershell.*-[Nn]op" \
+    "Interactive shell command string (reverse shell invocation)" "CRITICAL"
+
+grep_files "require\s*\(\s*['\"]node-cron['\"]|cron\.schedule\s*\(\|node-schedule\b" \
+    "Cron/scheduler library (persistence via scheduled task execution)" "MEDIUM"
+
+grep_files "\.bashrc\b|\.bash_profile\b|\.zshrc\b|/etc/rc\.local\|/etc/profile" \
+    "Shell startup file paths (persistence injection target)" "HIGH"
+
+grep_files "HKCU.*Run\|HKLM.*Run\|CurrentVersion.Run\|require\s*\(\s*['\"]regedit['\"]" \
+    "Windows registry Run key or regedit module (startup persistence)" "CRITICAL"
+
+grep_files "require\s*\(\s*['\"]node-windows['\"]|require\s*\(\s*['\"]winser['\"]" \
+    "Windows service registration library (system-level persistence)" "HIGH"
+
+grep_files "pm2\s+startup\|pm2.*--watch.*start\|forever\s+start\b" \
+    "Process manager startup command (pm2/forever — persistence mechanism)" "MEDIUM"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  STEP 12 — BROWSER / ELECTRON EXPLOITATION
+#  Electron misconfigurations grant renderer processes full OS access
+# ─────────────────────────────────────────────────────────────────────────────
+echo -e "\n${BOLD}[12/13] Checking for Electron/browser exploitation patterns...${RESET}"
+
+grep_files "nodeIntegration\s*:\s*true" \
+    "Electron nodeIntegration:true (renderer has unrestricted Node.js access — RCE)" "CRITICAL"
+
+grep_files "contextIsolation\s*:\s*false" \
+    "Electron contextIsolation:false (no security boundary between renderer and Node.js)" "HIGH"
+
+grep_files "enableRemoteModule\s*:\s*true" \
+    "Electron enableRemoteModule:true (deprecated RCE vector from renderer process)" "HIGH"
+
+grep_files "webSecurity\s*:\s*false" \
+    "Electron webSecurity:false (disables same-origin policy entirely)" "HIGH"
+
+grep_files "allowRunningInsecureContent\s*:\s*true" \
+    "Electron allowRunningInsecureContent:true (loads HTTP content in HTTPS app)" "MEDIUM"
+
+grep_files "remote\.require\s*\(\|electron\.remote\." \
+    "Electron remote.require() (executes Node.js from renderer process — RCE)" "HIGH"
+
+grep_files "Chrome.*User Data\|Google/Chrome\|BraveSoftware\|Chromium.*Default" \
+    "Chromium-based browser profile path access (credential/cookie theft)" "CRITICAL"
+
+grep_files "\.mozilla.firefox\|Firefox.*Profiles\|key4\.db\|logins\.json\|cookies\.sqlite" \
+    "Firefox profile or credential database access" "CRITICAL"
+
+grep_files "win32clipboard\|clipboard\.readText\(\)\|nativeImage.*clipboard" \
+    "Clipboard read access (captures copy-pasted passwords and tokens)" "HIGH"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  STEP 13 — CRYPTOMINING, BOT EXFILTRATION & ANTI-ANALYSIS
+# ─────────────────────────────────────────────────────────────────────────────
+echo -e "\n${BOLD}[13/13] Checking for cryptomining, bot exfiltration, and evasion...${RESET}"
+
+grep_all "stratum\+tcp://\|pool\.minergate\|xmrig\b\|cryptonight\|coinhive\|monero.*mining" \
+    "Cryptomining pool or miner binary reference" "CRITICAL"
+
+grep_files "DISCORD_TOKEN\|discordapp\.com/api/webhooks\|discord\.js\b\|discord\.gg/" \
+    "Discord token or webhook (data exfiltration via Discord bots)" "HIGH"
+
+grep_files "TELEGRAM_BOT_TOKEN\|api\.telegram\.org/bot\|TelegramBot\s*\(" \
+    "Telegram bot API (data exfiltration via Telegram)" "HIGH"
+
+grep_files "hooks\.slack\.com\|SLACK_WEBHOOK\|xoxb-[A-Za-z0-9]+\|xoxp-[A-Za-z0-9]+" \
+    "Slack webhook URL or token (data exfiltration via Slack)" "HIGH"
+
+grep_files "0x[0-9a-fA-F]{40}\b" \
+    "Hardcoded Ethereum wallet address (cryptomining payout or ransom target)" "MEDIUM"
+
+grep_files "require\s*\(\s*['\"]inspector['\"]|process\.debugPort\b\|v8debug\b" \
+    "Debugger/inspector module usage (analysis evasion by detecting attached debugger)" "HIGH"
+
+grep_files "os\.cpus\(\)\.length\s*[<>]\s*[2-4]\b\|os\.totalmem\(\)\s*[<>]\|os\.freemem\(\)\s*[<>]" \
+    "CPU/memory resource check (VM detection — sandbox VMs have fewer cores/less RAM)" "HIGH"
+
+grep_files "!process\.env\.CI\b\|process\.env\.CI\s*===\s*undefined\|!process\.env\.GITHUB_ACTIONS" \
+    "CI environment negation (executes only outside CI pipelines — evasion)" "HIGH"
+
+grep_files "setTimeout\s*\([^,)]*,\s*[0-9]{6,}\s*\)\|setInterval\s*\([^,)]*,\s*[0-9]{6,}\s*\)" \
+    "Very long timeout/interval delay (time-bomb or sandbox timeout evasion)" "MEDIUM"
+
+grep_files "new\s+Date\s*\(['\"]20[2-9][0-9]\|Date\.now\(\)\s*[>=!]+\s*new\s+Date" \
+    "Date-conditional execution (time-bomb — activates after a hardcoded future date)" "HIGH"
+
+grep_files "process\.env\.[A-Z_]{3,}\s*\?\?\s*process\.exit\|process\.env\.[A-Z_]{3,}.*\|\|\s*process\.exit" \
+    "Environment variable check triggering process.exit (anti-analysis bail-out)" "MEDIUM"
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  FINAL REPORT

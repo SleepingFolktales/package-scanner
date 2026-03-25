@@ -83,7 +83,7 @@ echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━�
 # ─────────────────────────────────────────────────────────────────────────────
 #  STEP 1 — DOWNLOAD PACKAGE (no install)
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "${BOLD}[1/8] Downloading package from PyPI (no install)...${RESET}"
+echo -e "${BOLD}[1/12] Downloading package from PyPI (no install)...${RESET}"
 
 PIP_CMD="pip"
 if [[ "$OS_TYPE" == "macos" ]] || [[ "$OS_TYPE" == "mac" ]]; then
@@ -110,7 +110,7 @@ echo -e "  ${GREEN}✓${RESET} Downloaded: $(basename "${WHEEL_FILE:-$TARGZ_FILE
 # ─────────────────────────────────────────────────────────────────────────────
 #  STEP 2 — EXTRACT
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "\n${BOLD}[2/8] Extracting package contents...${RESET}"
+echo -e "\n${BOLD}[2/12] Extracting package contents...${RESET}"
 EXTRACT_DIR="$WORK_DIR/extracted"
 mkdir -p "$EXTRACT_DIR"
 
@@ -159,7 +159,7 @@ grep_check_binary() {
 # ─────────────────────────────────────────────────────────────────────────────
 #  STEP 3 — .PTH FILE CHECK (primary litellm attack vector)
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "\n${BOLD}[3/8] Checking for .pth backdoor files...${RESET}"
+echo -e "\n${BOLD}[3/12] Checking for .pth backdoor files...${RESET}"
 PTH_FILES=$(find "$EXTRACT_DIR" -name "*.pth" 2>/dev/null)
 
 if [[ -z "$PTH_FILES" ]]; then
@@ -193,7 +193,7 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 #  STEP 4 — BASE64 & OBFUSCATION CHECKS
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "\n${BOLD}[4/8] Scanning for obfuscation and encoded payloads...${RESET}"
+echo -e "\n${BOLD}[4/12] Scanning for obfuscation and encoded payloads...${RESET}"
 
 grep_check "base64\.b64decode\s*\(" \
     "base64.b64decode() used" "MEDIUM"
@@ -220,7 +220,7 @@ grep_check "zlib\.decompress.*exec|exec.*zlib\.decompress" \
 # ─────────────────────────────────────────────────────────────────────────────
 #  STEP 5 — SUBPROCESS & NETWORK EXFILTRATION
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "\n${BOLD}[5/8] Checking for subprocess and network activity...${RESET}"
+echo -e "\n${BOLD}[5/12] Checking for subprocess and network activity...${RESET}"
 
 grep_check "subprocess\.(Popen|call|run|check_output)" \
     "subprocess execution found" "HIGH"
@@ -254,7 +254,7 @@ grep_check "\.onion|pastebin\.com|ngrok\.io|requestbin\." \
 # ─────────────────────────────────────────────────────────────────────────────
 #  STEP 6 — CREDENTIAL HARVESTING PATTERNS
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "\n${BOLD}[6/8] Scanning for credential harvesting patterns...${RESET}"
+echo -e "\n${BOLD}[6/12] Scanning for credential harvesting patterns...${RESET}"
 
 grep_check "\.ssh/id_rsa|\.ssh/id_ed25519|\.ssh/authorized_keys" \
     "SSH key file paths referenced" "CRITICAL"
@@ -301,7 +301,7 @@ grep_check "slack.*webhook|discord.*webhook|https://hooks\." \
 # ─────────────────────────────────────────────────────────────────────────────
 #  STEP 7 — ENCRYPTION & STAGING PATTERNS
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "\n${BOLD}[7/8] Checking for encryption/staging (exfil prep)...${RESET}"
+echo -e "\n${BOLD}[7/12] Checking for encryption/staging (exfil prep)...${RESET}"
 
 grep_check "openssl.*aes-256|openssl.*enc.*-pbkdf2" \
     "openssl AES-256 encryption (data staging before exfil)" "CRITICAL"
@@ -321,7 +321,7 @@ grep_check "MIICIjANBgkqhkiG9w0BAQEFAA|BEGIN PUBLIC KEY|BEGIN RSA" \
 # ─────────────────────────────────────────────────────────────────────────────
 #  STEP 8 — SETUP.PY / PYPROJECT HOOK ABUSE
 # ─────────────────────────────────────────────────────────────────────────────
-echo -e "\n${BOLD}[8/8] Checking install hook abuse and RECORD tampering...${RESET}"
+echo -e "\n${BOLD}[8/12] Checking install hook abuse and RECORD tampering...${RESET}"
 
 # setup.py with subprocess in install commands
 SETUP_PY=$(find "$EXTRACT_DIR" -name "setup.py" | head -1)
@@ -360,6 +360,146 @@ while IFS= read -r init; do
             "$(basename "$(dirname "$init")")/__init__.py runs on import"
     fi
 done <<< "$INIT_FILES"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  STEP 9 — REVERSE SHELL & PERSISTENCE MECHANISMS
+# ─────────────────────────────────────────────────────────────────────────────
+echo -e "\n${BOLD}[9/12] Checking for reverse shell and persistence patterns...${RESET}"
+
+grep_check "socket\.socket.*AF_INET|AF_INET.*SOCK_STREAM" \
+    "Raw TCP socket creation (reverse shell precursor)" "HIGH"
+
+grep_check "os\.dup2.*socket|socket.*pipe|socket.*connect.*subprocess|subprocess.*socket.*connect" \
+    "Socket + subprocess file descriptor redirect (classic reverse shell pattern)" "CRITICAL"
+
+grep_check "pty\.spawn|pty\.fork|openpty\b" \
+    "PTY allocation (interactive reverse shell or privilege escalation)" "HIGH"
+
+grep_check "os\.dup2\s*\(|os\.execve\s*\(|os\.execl\b" \
+    "File descriptor redirect + exec (shell replacement pattern)" "CRITICAL"
+
+grep_check "/etc/cron\b|crontab\s+-[li]|crontab\s*<<" \
+    "Cron job manipulation (persistence mechanism)" "CRITICAL"
+
+grep_check "\.bashrc\b|\.bash_profile\b|\.profile\b|\.zshrc\b" \
+    "Shell config file modification (startup persistence)" "HIGH"
+
+grep_check "/etc/rc\.local|/etc/init\.d|/etc/systemd/system|launchctl.*load|launchd" \
+    "System service/startup file access (boot persistence)" "CRITICAL"
+
+grep_check "HKCU.*Run|HKLM.*Run|CurrentVersion.Run|winreg|_winreg|RegSetValue|OpenKey.*HKEY" \
+    "Windows registry access (startup persistence or config tampering)" "CRITICAL"
+
+grep_check "schtasks\b|Task Scheduler|at\.exe\b" \
+    "Windows scheduled task creation (persistence)" "HIGH"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  STEP 10 — IMPORT HOOK & REFLECTION ABUSE
+#  Allows code to intercept/hijack the module loading system globally
+# ─────────────────────────────────────────────────────────────────────────────
+echo -e "\n${BOLD}[10/12] Scanning for import hook and reflection abuse...${RESET}"
+
+grep_check "sys\.meta_path\b" \
+    "sys.meta_path modification (intercepts all module imports globally)" "CRITICAL"
+
+grep_check "sys\.path_hooks\b|sys\.path_importer_cache\b" \
+    "Custom import path hooks (hijacks import resolution order)" "HIGH"
+
+grep_check "importlib\.util\.spec_from_loader|importlib\.machinery\." \
+    "importlib machinery manipulation (custom loader injection)" "HIGH"
+
+grep_check "__builtins__\[|__builtins__\.__dict__|builtins\.__dict__" \
+    "Built-in function override (__builtins__ tampering — replaces open/print/input)" "CRITICAL"
+
+grep_check "ctypes\.CDLL|ctypes\.cdll\.|ctypes\.windll\.|cffi\.FFI\(\)" \
+    "ctypes/cffi usage (loads and executes arbitrary native library code)" "HIGH"
+
+grep_check "ctypes.*memmove|ctypes.*memcpy|ctypes\.cast.*c_char_p" \
+    "ctypes memory manipulation (shellcode injection pattern)" "CRITICAL"
+
+grep_check "sys\.settrace\s*\(|sys\.setprofile\s*\(" \
+    "sys.settrace/setprofile (intercepts every function call — spy/keylogger pattern)" "HIGH"
+
+grep_check "__import__\s*\(['\"]os['\"]|__import__\s*\(['\"]subprocess\|__import__\s*\(['\"]socket" \
+    "Dynamic __import__ of sensitive modules (evasion from static analysis)" "HIGH"
+
+grep_check "getattr\s*\(\s*__builtins__\|vars\s*\(\s*__builtins__" \
+    "Dynamic attribute access on __builtins__ (stealth function override)" "HIGH"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  STEP 11 — SURVEILLANCE & DATA COLLECTION
+#  Keyloggers, screen capture, clipboard access, browser credential theft
+# ─────────────────────────────────────────────────────────────────────────────
+echo -e "\n${BOLD}[11/12] Checking for surveillance and data collection capabilities...${RESET}"
+
+grep_check "pynput\b|keyboard\.on_press|keyboard\.Listener\b|pyHook\b" \
+    "Keylogger library detected (pynput/keyboard/pyHook)" "CRITICAL"
+
+grep_check "PIL\.ImageGrab|pyautogui\.screenshot|mss\.mss\(\)|Xlib\.display" \
+    "Screen capture capability (PIL.ImageGrab/pyautogui/mss)" "HIGH"
+
+grep_check "sounddevice\.rec\(|pyaudio\.PyAudio\(\)|AudioSegment\.from_mic" \
+    "Microphone/audio recording capability detected" "HIGH"
+
+grep_check "cv2\.VideoCapture\s*\(\s*[01]\s*\)" \
+    "Webcam capture via OpenCV (device index 0 or 1)" "HIGH"
+
+grep_check "Chrome.*User Data|Google/Chrome|BraveSoftware|Chromium" \
+    "Chromium-based browser profile path (credential/cookie theft)" "CRITICAL"
+
+grep_check "\.mozilla/firefox|Firefox.*Profiles|Library.*Firefox" \
+    "Firefox profile directory access (credential/cookie theft)" "CRITICAL"
+
+grep_check "Login Data\b|Web Data\b|key4\.db\b|logins\.json\b|cookies\.sqlite" \
+    "Browser credential/cookie storage file access" "CRITICAL"
+
+grep_check "pyperclip\b|xerox\.copy\|xclip\b|win32clipboard" \
+    "Clipboard read access (captures copy-pasted passwords and tokens)" "HIGH"
+
+grep_check "DISCORD_TOKEN\|discordapp\.com|discord\.gg/" \
+    "Discord token or API (data exfiltration via Discord)" "HIGH"
+
+grep_check "TELEGRAM_BOT_TOKEN\|api\.telegram\.org/bot|TeleBot\b|telepot\b" \
+    "Telegram bot API (data exfiltration via Telegram)" "HIGH"
+
+grep_check "stratum\+tcp://|pool\.minergate|xmrig\b|cryptonight\b|coinhive" \
+    "Cryptomining pool or miner binary reference" "CRITICAL"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  STEP 12 — ANTI-ANALYSIS & EVASION TECHNIQUES
+#  Time bombs, sandbox/VM detection, geofencing, probabilistic execution
+# ─────────────────────────────────────────────────────────────────────────────
+echo -e "\n${BOLD}[12/12] Scanning for anti-analysis and evasion techniques...${RESET}"
+
+grep_check "sys\.gettrace\(\)|ctypes.*IsDebuggerPresent|CheckRemoteDebuggerPresent" \
+    "Debugger detection (halts or alters execution under analysis)" "HIGH"
+
+grep_check "vboxguest\|vmware\|virtualbox\|VBoxGuestAdditions\|QEMU\b\|hypervisor" \
+    "Hypervisor/VM artifact strings (sandbox evasion by detecting analysis env)" "HIGH"
+
+grep_check "dmidecode\b|cpuid\b|wmic.*model.*Virtual" \
+    "Hardware fingerprinting for VM detection" "HIGH"
+
+grep_check "time\.sleep\s*\([1-9][0-9]{2,}" \
+    "Long sleep delay (100+ seconds) — sandbox timeout evasion" "MEDIUM"
+
+grep_check "datetime\.date\.today\(\)\s*[><=!]\|datetime\.now\(\)\s*[><=!]\|if.*date.*>=" \
+    "Date-conditional execution (time-bomb — activates after a hardcoded date)" "HIGH"
+
+grep_check "requests\.get.*ipinfo\.io\|requests\.get.*ip-api\.com\|ipgeoloc\|geoip" \
+    "IP geolocation lookup (geofencing — executes only in target region)" "HIGH"
+
+grep_check "os\.getenv\s*\(\s*['\"]CI['\"]|GITHUB_ACTIONS\b\|JENKINS_URL\b\|TRAVIS\b\|CIRCLECI" \
+    "CI/CD environment detection (behaves differently in pipelines vs real installs)" "HIGH"
+
+grep_check "os\.environ\.get.*SANDBOX\|PYCHARM_HOSTED\|VSCODE_PID\|TERM_PROGRAM.*iTerm" \
+    "IDE/sandbox environment detection (evasion from security tooling)" "MEDIUM"
+
+grep_check "random\.randint.*if\|random\.choice.*exec\|random\.random\(\)\s*<\s*0\.[0-9]" \
+    "Probabilistic execution (triggers on only X% of installs — hard to reproduce)" "HIGH"
+
+grep_check "codecs\.decode.*rot.13\|codecs\.decode.*rot13\|''.join.*reversed\b" \
+    "ROT13/string reversal obfuscation (manual deobfuscation evasion)" "MEDIUM"
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  REPORT
